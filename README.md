@@ -2,5 +2,5 @@
 This is a real time Render engine built using OpenGL API, work in progress...
 
 ## Screenshots
-<image src="./Screenshot.png" width="700" align="center">
+<image align="center" src="./Screenshot.png" width="700">
 
