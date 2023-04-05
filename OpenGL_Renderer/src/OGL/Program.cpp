@@ -77,7 +77,7 @@ void Program::setUniformTexture(const GLchar* uniformName, const int value)
     glUniform1i(uniform(uniformName), value);
 }
 
-void Program::setUniformMat4f(const GLchar* uniformName, GLsizei size, GLboolean transpose, const glm::mat4 value) {
+void Program::setUniformMat4f(const GLchar* uniformName, const glm::mat4& value, GLsizei size, GLboolean transpose) {
     glUniformMatrix4fv(uniform(uniformName), size, transpose, glm::value_ptr(value));
 }
 

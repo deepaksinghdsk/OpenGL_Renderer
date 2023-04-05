@@ -6,7 +6,7 @@ using namespace ogl;
 static const float MaxVerticalAngle = 85.0f;
 
 Camera::Camera() :
-	_position(0.0f, 0.0f, 1.0f),
+	_position(3.0f, 3.0f, 3.0f),
 	_horizontalAngle(0.0f),
 	_verticalAngle(0.0f),
 	_fieldOfView(45.0f),
@@ -62,7 +62,7 @@ void Camera::setNearAndFarPlane(float nearPlane, float farPlane)
 
 glm::mat4 Camera::orientation() const
 {
-	glm::mat4 orientation;
+	glm::mat4 orientation = glm::mat4(1.0f);
 	orientation = glm::rotate(orientation, glm::radians(_verticalAngle), glm::vec3(1, 0, 0));
 	orientation = glm::rotate(orientation, glm::radians(_horizontalAngle), glm::vec3(0, 1, 0));
 	return orientation;
@@ -126,7 +126,7 @@ glm::mat4 Camera::projection() const
 
 glm::mat4 Camera::view() const
 {
-	return orientation() * glm::translate(glm::mat4(), -_position);
+	return orientation() * glm::translate(glm::mat4(1.0f), -_position);
 }
 
 void ogl::Camera::normalizeAngles()

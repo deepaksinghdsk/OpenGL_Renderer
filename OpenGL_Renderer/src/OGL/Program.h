@@ -38,7 +38,7 @@ namespace ogl {
 
 		void setUniformTexture(const GLchar* uniformName, const int value);
 
-		void setUniformMat4f(const GLchar* uniformName, GLsizei size, GLboolean transpose, const glm::mat4 value);
+		void setUniformMat4f(const GLchar* uniformName, const glm::mat4& value, GLsizei size=1, GLboolean transpose=GL_FALSE);
 
 		//void setUniform(const GLchar* uniformName, const glm::vec4& v);
 

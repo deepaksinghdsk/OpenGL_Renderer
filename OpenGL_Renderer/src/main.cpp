@@ -8,16 +8,18 @@
 #include "ogl/Program.h"
 #include "ogl/Texture.h"
 #include "ogl/Camera.h"
+#include <glm\gtc\type_ptr.hpp>
+#include <glm\gtx\string_cast.hpp>
 
 //constants
 const glm::vec2 SCREEN_SIZE(800, 600);
 
 //globals
 GLFWwindow* gWindow = NULL;
-double gScrollY = 0.0;
 ogl::Program* gProgram = NULL;
 ogl::Texture* gTexture = NULL;
 ogl::Camera gCamera;
+double gScrollY = 0.0;
 GLuint gVAO = 0;
 GLuint gVBO = 0;
 GLfloat gDegreesRotated = 0.0f;
@@ -29,19 +31,18 @@ void LoadShaders() {
 	shaders.push_back(ogl::Shader::shaderFromFile("../OpenGL_Renderer/res/shaders/fragment_shader.glsl", GL_FRAGMENT_SHADER));
 
 	gProgram = new ogl::Program(shaders);
-	/*
-*/
+	
 	glUseProgram(gProgram->object());
 	
-	//set the camera uniform in vertex shader, becuase it's not going to change
-	glm::mat4 camera = glm::lookAt(glm::vec3(3, 3, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-	gProgram->setUniformMat4f("camera", 1, false, camera);
-
-	//gProgram->setUniformMat4f("model", 1, false, glm::rotate(glm::mat4(), glm::radians(90.0f), glm::vec3(0, 1, 0)));
-
 	//set the projection uniform in vertex shader, becuase it's not going to change
-	glm::mat4 projection = glm::perspective(glm::radians(45.0f), 4.0f / 3.0f, 0.1f, 10.0f);
-	gProgram->setUniformMat4f("projection", 1, false, projection);
+	//glm::mat4 projection = glm::perspective(glm::radians(50.0f), SCREEN_SIZE.x/SCREEN_SIZE.y, 0.1f, 10.0f);
+	//gProgram->setUniformMat4f("projection", projection, 1, false);
+	
+	//set the camera uniform in vertex shader, becuase it's not going to change
+	//glm::mat4 camera = glm::lookAt(glm::vec3(3, 3, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	//gProgram->setUniformMat4f("camera", camera, 1, false);
+	
+	//std::cout << glm::to_string(camera) << std::endl;
 
 	glUseProgram(0);
 	
@@ -157,10 +158,12 @@ void Render() {
 	gProgram->setUniformTexture("tex", 0); // set to 0 because the texture is bound to GL_TEXTURE0
 
 	//set the "camera" uniform
-	//gProgram->setUniformMat4f("camera", 1, false, gCamera.matrix());
+	gProgram->setUniformMat4f("camera", gCamera.matrix());
 
 	//set the "model" uniform in the vertex shader, based on the gDegreesRotated global
-	//gProgram->setUniformMat4f("model", 1, false, glm::rotate(glm::mat4(), glm::radians(45.0f), glm::vec3(0, 1, 0)));
+	gProgram->setUniformMat4f("model", glm::rotate(glm::mat4(1.0f), glm::radians(gDegreesRotated), glm::vec3(0, 1, 0)));
+
+	//std::cout << glm::to_string(rotation) << std::endl;
 
 	//bind the VAO (the triangle)
 	glBindVertexArray(gVAO);
@@ -185,7 +188,7 @@ void onError(int errorCode, const char* msg) {
 void Update(float secondsElapsed) {
 	//rotate the cube
 	const GLfloat degreesPerSecond = 90.0f;
-	gDegreesRotated += secondsElapsed * degreesPerSecond;
+	gDegreesRotated += degreesPerSecond * secondsElapsed;
 	while (gDegreesRotated > 360.0f) gDegreesRotated -= 360.0f;
 
 	//move position of camera based on WASD keys
@@ -197,7 +200,7 @@ void Update(float secondsElapsed) {
 
 	if (glfwGetKey(gWindow, 'A'))
 		gCamera.offsetPosition(secondsElapsed * moveSpeed * -gCamera.right());
-	else if (glfwGetKey(gWindow, 'S'))
+	else if (glfwGetKey(gWindow, 'D'))
 		gCamera.offsetPosition(secondsElapsed * moveSpeed * gCamera.right());
 
 	if (glfwGetKey(gWindow, 'Z'))
@@ -205,14 +208,28 @@ void Update(float secondsElapsed) {
 	else if (glfwGetKey(gWindow, 'X'))
 		gCamera.offsetPosition(secondsElapsed * moveSpeed * glm::vec3(0, 1, 0));
 
+	if(glfwGetKey(gWindow, 'F'))
+		gCamera.lookAt(glm::vec3(0, 0, 0));
+
 	//rotate camera based on mouse movement
 	const float mouseSensitivity = 0.1f;
 	double mouseX, mouseY;
 	glfwGetCursorPos(gWindow, &mouseX, &mouseY);
 	gCamera.offsetOrientation(mouseSensitivity * (float)mouseY, mouseSensitivity * (float)mouseX);
 
+	const float zoomSensitivity = 1.0f;
+	float fieldOfView = gCamera.fieldOfView() + zoomSensitivity * (float)gScrollY;
+	if (fieldOfView < 5.0f) fieldOfView = 5.0f;
+	if (fieldOfView > 130.0f) fieldOfView = 130.0f;
+	gCamera.setFieldOfView(fieldOfView);
+	gScrollY = 0;
+
 	//reset the mouse, so it doesn't go out of the window
-	//glfwSetCursorPos(gWindow, 0, 0);
+	glfwSetCursorPos(gWindow, 0, 0);
+}
+
+void onScroll(GLFWwindow* window, double deltaX, double deltaY) {
+	gScrollY += deltaY;
 }
 
 // the program statrs here
@@ -234,12 +251,12 @@ void AppMain() {
 		throw std::runtime_error("glfwCreateWindow failed. Check support for OpenGL 3.2");
 
 	//GLFW settings, Make this windows context current
-	//glfwSetInputMode(gWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetInputMode(gWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwSetCursorPos(gWindow, 0, 0);
+	glfwSetScrollCallback(gWindow, onScroll);
 	glfwMakeContextCurrent(gWindow);
 
 	//initialise GLEW
-	//glewExperimental = GL_TRUE; //stops glew crashing on OSX :-/
 	if (glewInit() != GLEW_OK)	
 		throw std::runtime_error("glewInit failed");
 
@@ -270,6 +287,7 @@ void AppMain() {
 
 	// setup gCamera
 	gCamera.setPosition(glm::vec3(0, 0, 4));
+	//gCamera.lookAt(glm::vec3(0, 0, 0));
 	gCamera.setViewportAspectRatio(SCREEN_SIZE.x / SCREEN_SIZE.y);
 
 	//run while the window is open
@@ -279,9 +297,9 @@ void AppMain() {
 		glfwPollEvents();
 
 		// update the scene based on the time elapsed since last update
-		/*double thisTime = glfwGetTime();
+		double thisTime = glfwGetTime();
 		Update((float)(thisTime - lastTime));
-		lastTime = thisTime;*/
+		lastTime = thisTime;
 
 		//drow one frame
 		Render();
