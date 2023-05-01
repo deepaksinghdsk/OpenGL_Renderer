@@ -3,7 +3,7 @@
 uniform mat4 model;
 uniform vec3 cameraPosition;
 uniform sampler2D tex;
-uniform float materialShininess;
+uniform float materialShininess = 0.01f;
 uniform vec3 materialSpecularColor;
 						 
 uniform struct Light{

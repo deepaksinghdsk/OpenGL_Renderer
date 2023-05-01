@@ -185,7 +185,7 @@ void loadWoodenCrateAsset() {
 	gWoodenCrate.drawCount = 6 * 2 * 3;
 	gWoodenCrate.texture = LoadTexture("../OpenGL_Renderer/res/textures/wooden-crate.jpg");
 	gWoodenCrate.shininess = 0.4;
-	gWoodenCrate.specularColor = glm::vec3(0.5f, 0.5f, 0.5f);
+	gWoodenCrate.specularColor = glm::vec3(0.3f, 0.3f, 0.3f);
 	LoadModel(&gWoodenCrate.vao, &gWoodenCrate.vbo, gWoodenCrate.shaders);
 }
 
