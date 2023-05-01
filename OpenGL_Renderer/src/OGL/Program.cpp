@@ -81,11 +81,26 @@ void Program::setUniformMat4f(const GLchar* uniformName, const glm::mat4& value,
     glUniformMatrix4fv(uniform(uniformName), size, transpose, glm::value_ptr(value));
 }
 
+void Program::setUniformVec3f(const GLchar* uniformName, const glm::vec3& value, GLsizei  size, GLboolean transpose) {
+    glUniform3fv(uniform(uniformName), size, glm::value_ptr(value));
+}
+
+void Program::setUniformf(const GLchar* uniformName, const float value) {
+    glUniform1f(uniform(uniformName), value);
+}
 //const Program& Program::operator=(const Program&)
 //{
 //    // TODO: insert return statement here
 //}
 //
+
+void Program::use() {
+    glUseProgram(_object);
+}
+
+void Program::stopUsing() {
+    glUseProgram(0);
+}
 
 GLuint Program::object() const
 {

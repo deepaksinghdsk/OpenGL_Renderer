@@ -95,6 +95,6 @@ void Bitmap::_set(unsigned width, unsigned height, Format format, void* pixels)
 
 	if (pixels) {
 		memcpy(_pixels, pixels, newSize);
-		std::cout << "size of pixel : " << newSize;
+		//std::cout << "size of pixel : " << newSize;
 	}
 }

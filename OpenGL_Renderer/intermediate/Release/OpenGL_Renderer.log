@@ -1,7 +1,10 @@
 ﻿  main.cpp
+D:\Dev\Visual Studio 2022\OpenGL_Renderer\OpenGL_Renderer\src\main.cpp(187,30): warning C4305: '=': truncation from 'double' to 'GLfloat'
+D:\Dev\Visual Studio 2022\OpenGL_Renderer\OpenGL_Renderer\src\main.cpp(218,56): warning C4305: 'argument': truncation from 'double' to 'float'
+D:\Dev\Visual Studio 2022\OpenGL_Renderer\OpenGL_Renderer\src\main.cpp(341,55): warning C4244: '+=': conversion from 'double' to 'GLfloat', possible loss of data
 LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
   Generating code
-  2 of 541 functions ( 0.4%) were compiled, the rest were copied from previous compilation.
+  1 of 601 functions ( 0.2%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
     10 functions had inline decision re-evaluated but remain unchanged
   Finished generating code

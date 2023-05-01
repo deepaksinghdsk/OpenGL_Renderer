@@ -38,15 +38,22 @@ namespace ogl {
 
 		void setUniformTexture(const GLchar* uniformName, const int value);
 
-		void setUniformMat4f(const GLchar* uniformName, const glm::mat4& value, GLsizei size=1, GLboolean transpose=GL_FALSE);
+		void setUniformMat4f(const GLchar* uniformName, const glm::mat4& value, GLsizei size = 1, GLboolean transpose = GL_FALSE);
+
+		void setUniformVec3f(const GLchar* uniformName, const glm::vec3& value, GLsizei  size = 1, GLboolean transpose = GL_FALSE);
+
+		void setUniformf(const GLchar* uniformName, const float value);
 
 		//void setUniform(const GLchar* uniformName, const glm::vec4& v);
+
+		void use();
+		void stopUsing();
 
 	private:
 		GLuint _object;
 		
-		Program(const Program& a);
-		const Program& operator=(const Program&);
+		//Program(const Program& a);
+		//const Program& operator=(const Program&);
 	};
 
 }

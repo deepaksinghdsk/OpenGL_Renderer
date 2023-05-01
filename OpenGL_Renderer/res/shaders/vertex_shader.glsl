@@ -6,9 +6,11 @@ uniform mat4 model;
 
 attribute vec3 vert;
 attribute vec2 vertTexCoord;
+attribute vec3 vertNormal;
 
+varying vec3 fragVert;
 varying vec2 fragTexCoord;
-varying vec3 vertex;
+varying vec3 fragNormal;
 
 mat4 rotation_x(float theta);
 mat4 rotation_y(float theta);
@@ -19,7 +21,8 @@ mat4 translate(float x, float y, float z);
 void main(){
 	// Pass the tex coord straight through to the fragment shader
 	fragTexCoord = vertTexCoord;
-	vertex = vert;
+	fragVert = vert;
+	fragNormal = vertNormal;
 
 	gl_Position = 
 		//projection * 

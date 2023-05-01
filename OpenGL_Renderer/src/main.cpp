@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <iostream>
+#include <list>
 
 #include "ogl/Program.h"
 #include "ogl/Texture.h"
@@ -14,25 +15,54 @@
 //constants
 const glm::vec2 SCREEN_SIZE(800, 600);
 
+struct ModelAsset {
+	ogl::Program* shaders;
+	ogl::Texture* texture;
+	GLuint vbo = 0;
+	GLuint vao = 0;
+	GLenum drawType;
+	GLint drawstart;
+	GLint drawCount;
+	GLfloat shininess;
+	glm::vec3 specularColor;
+};
+
+struct ModelInstance {
+	ModelAsset* asset;
+	glm::mat4 transform;
+};
+
+struct Light {
+	glm::vec3 position;
+	glm::vec3 intensities; //a.k.a. the color of the light
+	float attenuation;
+	float ambientCoefficient;
+};
+
 //globals
+//ogl::Program* gProgram = NULL;
+//ogl::Texture* gTexture = NULL;
+//GLuint gVAO = 0;
+//GLuint gVBO = 0;
 GLFWwindow* gWindow = NULL;
-ogl::Program* gProgram = NULL;
-ogl::Texture* gTexture = NULL;
+ModelAsset gWoodenCrate;
+std::list<ModelInstance> gInstances;
 ogl::Camera gCamera;
+Light gLight;
+ogl::Program* currentShaders = NULL;
+ogl::Texture* currentTextures = NULL;
 double gScrollY = 0.0;
-GLuint gVAO = 0;
-GLuint gVBO = 0;
 GLfloat gDegreesRotated = 0.0f;
 
 // loads the vertex shader and fragment shader, and links them to make a global gProgram
-void LoadShaders() {
+ogl::Program* LoadShaders(const char* vertexShader, const char* fragmentShader) {
 	std::vector<ogl::Shader> shaders;
-	shaders.push_back(ogl::Shader::shaderFromFile("../OpenGL_Renderer/res/shaders/vertex_shader.glsl", GL_VERTEX_SHADER));
-	shaders.push_back(ogl::Shader::shaderFromFile("../OpenGL_Renderer/res/shaders/fragment_shader.glsl", GL_FRAGMENT_SHADER));
+	shaders.push_back(ogl::Shader::shaderFromFile(vertexShader, GL_VERTEX_SHADER));
+	shaders.push_back(ogl::Shader::shaderFromFile(fragmentShader, GL_FRAGMENT_SHADER));
 
-	gProgram = new ogl::Program(shaders);
+	ogl::Program* program = new ogl::Program(shaders);
 	
-	glUseProgram(gProgram->object());
+	glUseProgram(program->object());
 	
 	//set the projection uniform in vertex shader, becuase it's not going to change
 	//glm::mat4 projection = glm::perspective(glm::radians(50.0f), SCREEN_SIZE.x/SCREEN_SIZE.y, 0.1f, 10.0f);
@@ -45,18 +75,19 @@ void LoadShaders() {
 	//std::cout << glm::to_string(camera) << std::endl;
 
 	glUseProgram(0);
-	
+
+	return program;
 }
 
 // loads a triangle into the VAO global
-void LoadModel() {
+void LoadModel(GLuint *vao, GLuint *vbo, ogl::Program* program) {
 	// make and bind the VAO
-	glGenVertexArrays(1, &gVAO);
-	glBindVertexArray(gVAO);
+	glGenVertexArrays(1, vao);
+	glBindVertexArray(*vao);
 
 	// make and bind the VBO
-	glGenBuffers(1, &gVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, gVBO);
+	glGenBuffers(1, vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, *vbo);
 
 	GLfloat triangleVertexData[] = {
 		//	X	  Y		Z		U	  V
@@ -66,70 +97,74 @@ void LoadModel() {
 	};
 
 	GLfloat cubeVertexData[] = {
-		//	X	  Y		Z		U	  V
+		//	X	  Y		Z		U	  V			Normal
 		// bottom
-		-1.0f,-1.0f,-1.0f,   0.0f, 0.0f,
-		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,
-		-1.0f,-1.0f, 1.0f,   0.0f, 1.0f,
-		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,
-		 1.0f,-1.0f, 1.0f,   1.0f, 1.0f,
-		-1.0f,-1.0f, 1.0f,   0.0f, 1.0f,
+		-1.0f,-1.0f,-1.0f,	 0.0f, 0.0f,	0.0f, -1.0f, 0.0f,
+		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,	0.0f, -1.0f, 0.0f,
+		-1.0f,-1.0f, 1.0f,   0.0f, 1.0f,	0.0f, -1.0f, 0.0f,
+		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,	0.0f, -1.0f, 0.0f,
+		 1.0f,-1.0f, 1.0f,   1.0f, 1.0f,	0.0f, -1.0f, 0.0f,
+		-1.0f,-1.0f, 1.0f,   0.0f, 1.0f,	0.0f, -1.0f, 0.0f,
 
 		// top
-		-1.0f, 1.0f,-1.0f,   0.0f, 0.0f,
-		-1.0f, 1.0f, 1.0f,   0.0f, 1.0f,
-		 1.0f, 1.0f,-1.0f,   1.0f, 0.0f,
-		 1.0f, 1.0f,-1.0f,   1.0f, 0.0f,
-		-1.0f, 1.0f, 1.0f,   0.0f, 1.0f,
-		 1.0f, 1.0f, 1.0f,   1.0f, 1.0f,
+		-1.0f, 1.0f,-1.0f,   0.0f, 0.0f,	0.0f, 1.0f, 0.0f,
+		-1.0f, 1.0f, 1.0f,   0.0f, 1.0f,	0.0f, 1.0f, 0.0f,
+		 1.0f, 1.0f,-1.0f,   1.0f, 0.0f,	0.0f, 1.0f, 0.0f,
+		 1.0f, 1.0f,-1.0f,   1.0f, 0.0f,	0.0f, 1.0f, 0.0f,
+		-1.0f, 1.0f, 1.0f,   0.0f, 1.0f,	0.0f, 1.0f, 0.0f,
+		 1.0f, 1.0f, 1.0f,   1.0f, 1.0f,	0.0f, 1.0f, 0.0f,
 
 		// front
-		-1.0f,-1.0f, 1.0f,   1.0f, 0.0f,
-		 1.0f,-1.0f, 1.0f,   0.0f, 0.0f,
-		-1.0f, 1.0f, 1.0f,   1.0f, 1.0f,
-		 1.0f,-1.0f, 1.0f,   0.0f, 0.0f,
-		 1.0f, 1.0f, 1.0f,   0.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,   1.0f, 1.0f,
+		-1.0f,-1.0f, 1.0f,   1.0f, 0.0f,	0.0f, 0.0f, 1.0f,
+		 1.0f,-1.0f, 1.0f,   0.0f, 0.0f,	0.0f, 0.0f, 1.0f,
+		-1.0f, 1.0f, 1.0f,   1.0f, 1.0f,	0.0f, 0.0f, 1.0f,
+		 1.0f,-1.0f, 1.0f,   0.0f, 0.0f,	0.0f, 0.0f, 1.0f,
+		 1.0f, 1.0f, 1.0f,   0.0f, 1.0f,	0.0f, 0.0f, 1.0f,
+		-1.0f, 1.0f, 1.0f,   1.0f, 1.0f,	0.0f, 0.0f, 1.0f,
 
 		// back
-		-1.0f,-1.0f,-1.0f,   0.0f, 0.0f,
-		-1.0f, 1.0f,-1.0f,   0.0f, 1.0f,
-		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,
-		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,
-		-1.0f, 1.0f,-1.0f,   0.0f, 1.0f,
-		 1.0f, 1.0f,-1.0f,   1.0f, 1.0f,
+		-1.0f,-1.0f,-1.0f,   0.0f, 0.0f,	0.0f, 0.0f, -1.0f,
+		-1.0f, 1.0f,-1.0f,   0.0f, 1.0f,	0.0f, 0.0f, -1.0f,
+		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,	0.0f, 0.0f, -1.0f,
+		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,	0.0f, 0.0f, -1.0f,
+		-1.0f, 1.0f,-1.0f,   0.0f, 1.0f,	0.0f, 0.0f, -1.0f,
+		 1.0f, 1.0f,-1.0f,   1.0f, 1.0f,	0.0f, 0.0f, -1.0f,
 
 		// left
-		-1.0f,-1.0f, 1.0f,   0.0f, 1.0f,
-		-1.0f, 1.0f,-1.0f,   1.0f, 0.0f,
-		-1.0f,-1.0f,-1.0f,   0.0f, 0.0f,
-		-1.0f,-1.0f, 1.0f,   0.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,   1.0f, 1.0f,
-		-1.0f, 1.0f,-1.0f,   1.0f, 0.0f,
+		-1.0f,-1.0f, 1.0f,   0.0f, 1.0f,	-1.0f, 0.0f, 0.0f,
+		-1.0f, 1.0f,-1.0f,   1.0f, 0.0f,	-1.0f, 0.0f, 0.0f,
+		-1.0f,-1.0f,-1.0f,   0.0f, 0.0f,	-1.0f, 0.0f, 0.0f,
+		-1.0f,-1.0f, 1.0f,   0.0f, 1.0f,	-1.0f, 0.0f, 0.0f,
+		-1.0f, 1.0f, 1.0f,   1.0f, 1.0f,	-1.0f, 0.0f, 0.0f,
+		-1.0f, 1.0f,-1.0f,   1.0f, 0.0f,	-1.0f, 0.0f, 0.0f,
 
 		// right
-		 1.0f,-1.0f, 1.0f,   1.0f, 1.0f,
-		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,
-		 1.0f, 1.0f,-1.0f,   0.0f, 0.0f,
-		 1.0f,-1.0f, 1.0f,   1.0f, 1.0f,
-		 1.0f, 1.0f,-1.0f,   0.0f, 0.0f,
-		 1.0f, 1.0f, 1.0f,   0.0f, 1.0f	
+		 1.0f,-1.0f, 1.0f,   1.0f, 1.0f,	1.0f, 0.0f, 0.0f,
+		 1.0f,-1.0f,-1.0f,   1.0f, 0.0f,	1.0f, 0.0f, 0.0f,
+		 1.0f, 1.0f,-1.0f,   0.0f, 0.0f,	1.0f, 0.0f, 0.0f,
+		 1.0f,-1.0f, 1.0f,   1.0f, 1.0f,	1.0f, 0.0f, 0.0f,
+		 1.0f, 1.0f,-1.0f,   0.0f, 0.0f,	1.0f, 0.0f, 0.0f,
+		 1.0f, 1.0f, 1.0f,   0.0f, 1.0f,	1.0f, 0.0f, 0.0f
 	};
 
 	// Put the three triangle vertices into the VBO
-	GLfloat vertexData[180];// = new GLfloat();
-	std::copy(std::begin(cubeVertexData), std::end(cubeVertexData), std::begin(vertexData));
+	//GLfloat *vertexData = new GLfloat();
+	//std::copy(std::begin(cubeVertexData), std::end(cubeVertexData), vertexData+1);
 	//vertexData = triangleVertexData;
 
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertexData), vertexData, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertexData), cubeVertexData, GL_STATIC_DRAW);
 	//glm::mat4 proj = glm::ortho();
+	
 	// connect the xyz to the "vert" attribute of the vertex shader
-	glEnableVertexAttribArray(gProgram->attrib("vert"));
-	glVertexAttribPointer(gProgram->attrib("vert"), 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), NULL);
+	glEnableVertexAttribArray(program->attrib("vert"));
+	glVertexAttribPointer(program->attrib("vert"), 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), NULL);
 
 	// connect the UV coords to the "vertTexCoord" attribute of the vertex shader
-	glEnableVertexAttribArray(gProgram->attrib("vertTexCoord"));
-	glVertexAttribPointer(gProgram->attrib("vertTexCoord"), 2, GL_FLOAT, GL_TRUE, 5 * sizeof(GLfloat), (const GLvoid*)(3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(program->attrib("vertTexCoord"));
+	glVertexAttribPointer(program->attrib("vertTexCoord"), 2, GL_FLOAT, GL_TRUE, 8 * sizeof(GLfloat), (const GLvoid*)(3 * sizeof(GLfloat)));
+
+	glEnableVertexAttribArray(program->attrib("vertNormal"));
+	glVertexAttribPointer(program->attrib("vertNormal"), 3, GL_FLOAT, GL_TRUE, 8 * sizeof(GLfloat), (const GLvoid*)(5 * sizeof(GLfloat)));
 
 	//unbind the VBO and VAO
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -137,14 +172,129 @@ void LoadModel() {
 }
 
 //load the file "hazard.png" into gTexture
-void LoadTexture() {
-	ogl::Bitmap bmp = ogl::Bitmap::bitmapFromFile("../OpenGL_Renderer/res/textures/wooden-crate.jpg");
+ogl::Texture* LoadTexture(const char* image) {
+	ogl::Bitmap bmp = ogl::Bitmap::bitmapFromFile(image);
 	bmp.flipVertically();
-	gTexture = new ogl::Texture(bmp);
+	return new ogl::Texture(bmp);
+}
+
+void loadWoodenCrateAsset() {
+	gWoodenCrate.shaders = LoadShaders("../OpenGL_Renderer/res/shaders/vertex_shader.glsl", "../OpenGL_Renderer/res/shaders/fragment_shader.glsl");
+	gWoodenCrate.drawType = GL_TRIANGLES;
+	gWoodenCrate.drawstart = 0;
+	gWoodenCrate.drawCount = 6 * 2 * 3;
+	gWoodenCrate.texture = LoadTexture("../OpenGL_Renderer/res/textures/wooden-crate.jpg");
+	gWoodenCrate.shininess = 0.4;
+	gWoodenCrate.specularColor = glm::vec3(0.5f, 0.5f, 0.5f);
+	LoadModel(&gWoodenCrate.vao, &gWoodenCrate.vbo, gWoodenCrate.shaders);
+}
+
+glm::mat4 translate(float x, float y, float z) {
+	return glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
+}
+
+glm::mat4 scale(float x, float y, float z) {
+	return glm::scale(glm::mat4(1.0f), glm::vec3(x, y, z));
+}
+
+void createInstances() {
+	ModelInstance dot;
+	dot.asset = &gWoodenCrate;
+	dot.transform = glm::mat4(1.0f);
+	gInstances.push_back(dot);
+
+	ModelInstance i;
+	i.asset = &gWoodenCrate;
+	i.transform = translate(0, -4, 0) * scale(1, 2, 1);
+	gInstances.push_back(i);
+
+	ModelInstance hLeft;
+	hLeft.asset = &gWoodenCrate;
+	hLeft.transform = translate(-8, 0, 0) * scale(1, 6, 1);
+	gInstances.push_back(hLeft);
+
+	ModelInstance hMid;
+	hMid.asset = &gWoodenCrate;
+	hMid.transform = translate(-6, 0, 0) * scale(2, 1, 0.8);
+	gInstances.push_back(hMid);
+
+	ModelInstance hRight;
+	hRight.asset = &gWoodenCrate;
+	hRight.transform = translate(-4, 0, 0) * scale(1, 6, 1);
+	gInstances.push_back(hRight);
+
+}
+
+void renderInstances(const ModelInstance* inst) {
+	ModelAsset* asset = inst->asset;
+	//ogl::Program* shaders = asset->shaders;
+
+	// bind the shaders
+	//currentShaders->use();
+
+	// set the shader uniforms
+	currentShaders->setUniformMat4f("camera", gCamera.matrix());
+	currentShaders->setUniformMat4f("model", inst->transform);
+	currentShaders->setUniformTexture("tex", 0);//set to 0 because the texture will be bound to GL_TEXTURE0
+	currentShaders->setUniformf("materialShininess", asset->shininess);
+	currentShaders->setUniformVec3f("materialSpecularColor", asset->specularColor);
+
+	currentShaders->setUniformVec3f("light.position", gLight.position);
+	currentShaders->setUniformVec3f("light.intensities", gLight.intensities);
+	currentShaders->setUniformf("light.attenuation", gLight.attenuation);
+	currentShaders->setUniformf("light.ambientCoefficient", gLight.ambientCoefficient); 
+
+	currentShaders->setUniformVec3f("cameraPosition", gCamera.position());
+
+	//bind the texure
+	//glActiveTexture(GL_TEXTURE0);
+	//glBindTexture(GL_TEXTURE_2D, asset->texture->object());
+
+	//bind VAO and draw
+	glBindVertexArray(asset->vao);
+	glDrawArrays(asset->drawType, asset->drawstart, asset->drawCount);
+
+	//unbind everything
+	glBindVertexArray(0);
+	//glBindTexture(GL_TEXTURE_2D, 0);
+	//currentShaders->stopUsing();
+}
+
+//draws multiple objects
+void Render() {
+	//clear Everything
+	glClearColor(0, 0, 0, 1);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//render all the instances
+	for (auto &it : gInstances) {
+		if (it.asset->shaders != currentShaders) {
+			if (currentShaders)
+				currentShaders->stopUsing();
+
+			currentShaders = it.asset->shaders;
+			currentShaders->use();
+			std::cout << "shader loaded" << std::endl;
+		}
+
+		if (it.asset->texture != currentTextures) {
+			if (currentTextures)
+				glBindTexture(GL_TEXTURE_2D, 0);
+
+			currentTextures = it.asset->texture;
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, currentTextures->object());
+		}
+
+		renderInstances(&it);
+	}
+
+	// swap the display buffers (displays what was just drawn)
+	glfwSwapBuffers(gWindow);
 }
 
 // draws a single frame
-void Render() {
+/*void Render() {
 	//clear everything
 	glClearColor(0, 0, 0, 1); // black
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -178,7 +328,7 @@ void Render() {
 
 	//swap the dispay buffers (displays what was just drawn)
 	glfwSwapBuffers(gWindow);
-}
+}*/
 
 void onError(int errorCode, const char* msg) {
 	throw std::runtime_error(msg);
@@ -188,11 +338,24 @@ void onError(int errorCode, const char* msg) {
 void Update(float secondsElapsed) {
 	//rotate the cube
 	const GLfloat degreesPerSecond = 90.0f;
-	gDegreesRotated += degreesPerSecond * secondsElapsed;
+	gDegreesRotated += degreesPerSecond * secondsElapsed * 0.02;
 	while (gDegreesRotated > 360.0f) gDegreesRotated -= 360.0f;
+	gInstances.front().transform = glm::rotate(glm::mat4(1.0f), gDegreesRotated, glm::vec3(0, 1, 0));
+
+	//move ligh
+	if (glfwGetKey(gWindow, '1'))
+		gLight.position = gCamera.position();
+
+	//change light color
+	if (glfwGetKey(gWindow, '2'))
+		gLight.intensities = glm::vec3(1, 0, 0); //red
+	else if (glfwGetKey(gWindow, '3'))
+		gLight.intensities = glm::vec3(0, 1, 0); //green
+	else if (glfwGetKey(gWindow, '4'))
+		gLight.intensities = glm::vec3(1, 1, 1); //white
 
 	//move position of camera based on WASD keys
-	const float moveSpeed = 2.0; //units per second
+	const float moveSpeed = 6.0; //units per second
 	if (glfwGetKey(gWindow, 'S'))
 		gCamera.offsetPosition(secondsElapsed * moveSpeed * -gCamera.forward());
 	else if (glfwGetKey(gWindow, 'W'))
@@ -277,18 +440,30 @@ void AppMain() {
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	// load vertex and fragment shaders into opengl
-	LoadShaders();
+	//LoadShaders();
 
 	// load the texture
-	LoadTexture();
+	//LoadTexture();
 
 	// create buffer and fill it with the points of the triangle
-	LoadModel();
+	//LoadModel();
+
+	loadWoodenCrateAsset();
+
+	createInstances();
+
 
 	// setup gCamera
-	gCamera.setPosition(glm::vec3(0, 0, 4));
+	gCamera.setPosition(glm::vec3(-4, 0, 17));
 	//gCamera.lookAt(glm::vec3(0, 0, 0));
 	gCamera.setViewportAspectRatio(SCREEN_SIZE.x / SCREEN_SIZE.y);
+	gCamera.setNearAndFarPlane(0.5f, 100.0f);
+
+	//setup light
+	gLight.position = glm::vec3(-4, 0, 1.4);
+	gLight.intensities = glm::vec3(1, 1, 1); //white
+	gLight.attenuation = 0.2f;
+	gLight.ambientCoefficient = 0.01f;
 
 	//run while the window is open
 	double lastTime = glfwGetTime();
@@ -310,6 +485,8 @@ void AppMain() {
 	}
 
 	//clean up and exit
+	glBindTexture(GL_TEXTURE_2D, 0);
+	currentShaders->stopUsing();
 	glfwTerminate();
 }
 
